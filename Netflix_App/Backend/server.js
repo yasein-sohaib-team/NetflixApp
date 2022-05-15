@@ -6,7 +6,7 @@ const cors = require("cors");
 const bodyParser = require("body-parser");
 const axios = require("axios");
 const apiKey = "218da8bf22c684d6bae14c5df2c30224";
-const apiUrl = `https:api.themoviedb.org/3/trending/all/week?api_key=${apiKey}&language=en-US`;
+//const apiUrl = `https:api.themoviedb.org/3/trending/all/week?api_key=${apiKey}&language=en-US`;
 const databaseUrl = `postgres://yaseinburqan:6437@localhost:5432/moviedatabase`;
 const { Client } = require("pg");
 const client = new Client(databaseUrl);
@@ -20,21 +20,20 @@ app.use(bodyParser.urlencoded({ extended: false }));
 app.use(bodyParser.json());
 const port = 5000;
 dotenv.config();
-//app.use(express.json());
 
 // end points
 app.get("/", homeHandler);
 app.get("/favorite", favoriteHandler);
 app.post("/addMovie", addMovieHandler);
-app.put("/update-movie/:name", updateMovieHandler);
+app.put("/updateMovie/:updateName", updateMovieHandler);
 app.get("/trending", trendingPageHandler);
-app.get("/getMovies", getHandler);
+app.get("/getMovie", getHandler);
 app.get("/getMovie/:id", getMovieByIdHandler);
-app.get("/search", searchMovieByNameHandler);
+app.get("/search/:name", searchMovieByNameHandler);
 app.delete("/delete/:id", deleteMovieHandler);
 app.get("/image", imageHandler);
 app.get("/topRated", topRatedHandler);
-app.get("error", errorHandler);
+app.get("*", errorHandler);
 
 function MoviesLibrary(id, title, releaseDate, posterPath, overview) {
   this.id = id;
@@ -46,10 +45,9 @@ function MoviesLibrary(id, title, releaseDate, posterPath, overview) {
 
 // end points handling functions
 
-// for 3rd API:
 async function homeHandler(req, res) {
-  const apiUrl = `https:api.themoviedb.org/3/movie/upcoming?api_key=${apiKey}&language=en-US&page=1`;
-  await axios
+  const apiUrl = `https://api.themoviedb.org/3/movie/upcoming?api_key=${apiKey}&language=en-US&page=1`;
+  https: await axios
     .get(apiUrl)
     .then((response) => {
       res.json(response.data);
@@ -64,7 +62,7 @@ function favoriteHandler(req, res) {
 }
 
 function addMovieHandler(req, res) {
-  const { name, time, summary, image, comment } = req.body;
+  let { name, time, summary, image, comment } = req.body;
 
   let sql = "INSERT INTO movie(name,time,summary,image,comment) VALUES($1, $2, $3, $4, $5) RETURNING *;";
   let values = [name, time, summary, image, comment];
@@ -77,11 +75,12 @@ function addMovieHandler(req, res) {
 }
 
 function updateMovieHandler(req, res) {
-  const { name, time, summary, image } = req.body;
-  const { updateName } = req.params;
+  //const { updateName } = req.params;
+  const { name, time, summary, image, comment } = req.body;
 
-  let sql = `UPDATE movie SET name=$1, time=$2, summary=$3, image=$4 WHERE id = $5 RETURNING *;`;
-  let values = [name, time, summary, image, updateName];
+  //let sql = `UPDATE movie SET name=$1, time=$2, summary=$3, image=$4 , comment=$5 WHERE id = $1 RETURNING *;`;
+  let sql = `UPDATE movie SET(name,time,summary,image,comment ) VALUES($1, $2, $3, $4,$5) RETURNING *;`; // sql query
+  let values = [name, time, summary, image, comment];
   client
     .query(sql, values)
     .then((result) => {
@@ -91,14 +90,14 @@ function updateMovieHandler(req, res) {
 }
 
 function trendingPageHandler(req, res) {
-  const apiUrl = `https:api.themoviedb.org/3/trending/all/week?api_key=${apiKey}`;
+  const apiUrl = `https://api.themoviedb.org/3/trending/all/week?api_key=${apiKey}`;
 
+  axios;
   axios
     .get(apiUrl)
     .then((value) => {
-      let trendier = value.data.results.map((movie) => {
-        movie = new MoviesLibrary(movie.id, movie.title, movie.releaseDate, movie.posterPath, movie.overview);
-        trendingMovies.push(movie);
+      let trendingMovies = value.data.results.map((movie) => {
+        return new MoviesLibrary(movie.id, movie.title, movie.releaseDate, movie.posterPath, movie.overview);
       });
       return res.status(200).json(trendingMovies);
     })
@@ -132,11 +131,13 @@ function getMovieByIdHandler(req, res) {
 
 function searchMovieByNameHandler(req, res) {
   let movieName = req.query.movieName;
-  const apiUrl = `https:api.themoviedb.org/3/movie/${movieId}?api_key=${apiKey}&query=${movieName}&page=2`;
+  let url = `https://api.themoviedb.org/3/search/movie?api_key=${apiKey}&query=${movieName}&page=2`;
+  // axios.get().then().catch()
   axios
-    .get(apiUrl)
+    .get(url)
     .then((result) => {
-      res.json(result.data);
+      // console.log(result.data.results);
+      res.json(result.data.results);
     })
     .catch((error) => {
       console.log(error);
@@ -145,13 +146,14 @@ function searchMovieByNameHandler(req, res) {
 }
 
 function deleteMovieHandler(req, res) {
-  const { movieId } = req.params.id;
-  console.log(movieId);
-  const sql = `DELETE  FROM movie WHERE id=${id};`;
+  const id = req.query.id;
+  let sql = "DELETE FROM movie WHERE id=$1;";
+  let value = [id];
   client
-    .query(sql)
-    .then(() => {
-      return res.status(204).send("deleted").json([]);
+    .query(sql, value)
+    .then((result) => {
+      console.log(result);
+      res.send("deleted");
     })
     .catch();
 }
@@ -162,12 +164,11 @@ function imageHandler(req, res) {
   axios
     .get(url)
     .then((result) => {
-      // console.log(result.data);
       res.json(result.data);
     })
     .catch((error) => {
       console.log(error);
-      res.send("Searching for data");
+      res.send("Error searching");
     });
 }
 
